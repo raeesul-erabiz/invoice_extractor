@@ -68,7 +68,7 @@ Extract the following from the invoice header or summary section:
 - `purchase_order`: Labeled as "PO", "Purchase Order", "Reference", or "Order No".
 - `total_amount`: Total amount **including GST**, labeled as "INVOICE TOTAL (GST Incl.)", "TOTAL DUE", or "TOTAL AMOUNT".
 - `total_tax`: Labeled as "TOTAL GST", "GST Amount", or "Total GST Included".
-- `total_excl_tax`: Labeled as "Net Line Total" or "Total Excl. GST". If not found, calculate: `total_amount - total_tax`.
+- `total_excl_tax`: If labeled (e.g., "Net Line Total", "Total Excl. GST"), extract the value. If not found, but both **"TAXABLE ITEM TOTAL"** and **"NON-TAXABLE ITEM TOTAL"** are available, calculate: `total_excl_tax = TAXABLE ITEM TOTAL + NON-TAXABLE ITEM TOTAL` Otherwise, calculate: `total_excl_tax = total_amount - total_tax`
 - `rounding`: If a "Rounding" field or adjustment is shown, include it.
 
 ===============================
@@ -83,7 +83,7 @@ For each product in the line items table:
 - `order_unit`: Always return "CTN"
 - `line_total_excl`: From "Net Value", "Ex. GST Amount", "Total Amt Ex GST", or similar.
 - `line_total_incl`: From "Total Incl. GST", "Total incl Taxes", or similar. If not found, calculate: `line_total_excl + line_total_tax`.
-- `line_total_tax`: If not labeled, calculate: `line_total_incl - line_total_excl`
+- `line_total_tax`: If labeled (e.g., "GST", "Tax Amount"), extract it. If not available, and a **Tax Rate** column exists, calculate: `line_total_tax = line_total_excl * (Tax Rate / 100)` Otherwise, calculate: `line_total_tax = line_total_incl - line_total_excl`
 - `order_unit_price_excl`: Labeled as "Unit Price", "Unit Price Ex GST", or calculate: `line_total_excl / order_quantity`
 - `order_unit_tax`: If not labeled, calculate: `line_total_tax / order_quantity`
 - `order_unit_price_incl`: If not labeled, calculate: `order_unit_price_excl + order_unit_tax`

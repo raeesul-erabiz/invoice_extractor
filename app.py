@@ -42,7 +42,9 @@ os.makedirs("results", exist_ok=True)
 
 # Process button
 if uploaded_files and st.button("🚀 Process Invoices"):
+    logging.info(f"Received {len(uploaded_files)} Invoices")
     for uploaded_file in uploaded_files:
+        logging.info(f"======================================")
         with st.spinner(f"Processing {uploaded_file.name}..."):
 
             # Save file to temp folder
@@ -88,3 +90,4 @@ if uploaded_files and st.button("🚀 Process Invoices"):
 
             with st.expander(f"📋 View Extracted Data for `{uploaded_file.name}`"):
                 st.json(updated_data)
+        logging.info(f"======================================")
