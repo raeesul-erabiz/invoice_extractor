@@ -3,3 +3,6 @@ pdfplumber
 python-dotenv
 langchain
 langchain-google-genai
+google-auth
+google-auth-oauthlib
+google-cloud-storage

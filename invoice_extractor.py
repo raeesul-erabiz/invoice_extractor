@@ -35,62 +35,82 @@ def extract_text_from_pdf(pdf_path):
 
 def extract_invoice_data(text, llm):
     logging.info("🧠 Running LLM for structured invoice data...")
-    
+
     prompt_template = PromptTemplate(
         input_variables=["text"],
         template="""
 You are an expert AI system specialized in extracting structured data from supplier invoices.
 
-You will be provided with one or more supplier invoice pages. Your task is to extract the following structured invoice data in strict JSON format.
+You will be provided with text extracted from a supplier invoice PDF. Your task is to extract the following structured invoice data in **valid JSON format** using the instructions below.
 
-IMPORTANT INSTRUCTIONS:
-1. Extract all visible data from the invoice without skipping any field.
-2. Use exact field names and structure shown in the output schema.
+===============================
+IMPORTANT INSTRUCTIONS
+===============================
+1. Extract all relevant information without skipping any field.
+2. Use **only** the fields and format shown in the schema below.
 3. If a field is missing or unclear, return it as an empty string "" or null.
-4. Always return the invoice_date and due_date in the format DD/MM/YYYY (e.g., 27/06/2025).
-5. Return only the JSON object without any explanation or commentary.
-6. Do not hallucinate or invent values.
+4. Dates must always be returned in the format DD/MM/YYYY (e.g., 27/06/2025).
+5. Return **only** a JSON object — no commentary or markdown.
+6. Do not hallucinate or guess values.
+7. Use calculated values **only if labels are not found**.
 
-===== HEADER FIELDS =====
-Extract the following fields from the header or summary section of the invoice:
-- supplier_name: usually near the top or next to "TAX INVOICE"
-- store_name: store address can found under "Ship To:"
-- invoice_number: near the label "Invoice:"
-- invoice_date: must be formatted as DD/MM/YYYY
-- due_date: must be formatted as DD/MM/YYYY
-- purchase_order: near "PO", "Purchase Order", or "Reference"
-- total_excl_tax: Total amount excluding GST. labeled like "Net Line Total" or "Total Excl. GST"
-- total_tax: Total tax amount of invoice. labeled like "TOTAL GST" or "GST Amount"
-- rounding: labeled as "Rounding on Invoices"
-- total_amount: Total amount including GST. labeled like "INVOICE TOTAL (GST Incl.)"
+===============================
+HEADER FIELDS
+===============================
 
-===== LINE ITEM FIELDS =====
-For each product listed in the line items section:
-- product_name: return the **exact** value of Description like '1KX12 CHICKEN BITES SOUTHER STYLE SUBWAY', '2000 COOKIE BAG REFRESH SUBWAY'
-- product_code: the numeric or alphanumeric code before the description
-- order_quantity: from "Qty Supplied"
-- order_unit: always return "CTN"
-- order_unit_price_excl: calculated as line_total_excl / Qty Supplied
-- order_unit_price_incl: calculated as order_unit_price_excl + order_unit_tax
-- order_unit_tax: calculated as GST / Qty Supplied
-- line_total_excl: Line total Net Value excluding GST 
-- line_total_incl: Total Incl. GST
-- gst_indicator: "GST" if order_unit_tax > 0 else "NO GST"
+Extract the following from the invoice header or summary section:
 
-===== SPECIAL CONDITIONS =====
-Exclude the following line items from `Line_Items` and handle them separately:
+- `supplier_name`: Usually near the top or next to "TAX INVOICE".
+- `store_name`: Found under or near "Ship To:" or delivery address.
+- `invoice_number`: Labeled as "Invoice", "Invoice No", "Invoice Nr", etc.
+- `invoice_date`: The invoice issue date.
+- `due_date`: If a specific date is present, return it. If not, and there is a "Due in X days" or similar (e.g., "Terms: 14 Days"), calculate: `due_date = invoice_date + due days`.
+- `purchase_order`: Labeled as "PO", "Purchase Order", "Reference", or "Order No".
+- `total_amount`: Total amount **including GST**, labeled as "INVOICE TOTAL (GST Incl.)", "TOTAL DUE", or "TOTAL AMOUNT".
+- `total_tax`: Labeled as "TOTAL GST", "GST Amount", or "Total GST Included".
+- `total_excl_tax`: Labeled as "Net Line Total" or "Total Excl. GST". If not found, calculate: `total_amount - total_tax`.
+- `rounding`: If a "Rounding" field or adjustment is shown, include it.
+
+===============================
+LINE ITEM FIELDS
+===============================
+
+For each product in the line items table:
+
+- `product_code`: Value under column labeled "Item No", "Item Code", "Product Code", "Code", or "Material No".
+- `product_name`: Return the full string from the "Description" or "Product" column exactly as shown.
+- `order_quantity`: From "Quantity", "Qty", "Qty Supplied", or "Sales Qty" column.
+- `order_unit`: Always return "CTN"
+- `line_total_excl`: From "Net Value", "Ex. GST Amount", "Total Amt Ex GST", or similar.
+- `line_total_incl`: From "Total Incl. GST", "Total incl Taxes", or similar. If not found, calculate: `line_total_excl + line_total_tax`.
+- `line_total_tax`: If not labeled, calculate: `line_total_incl - line_total_excl`
+- `order_unit_price_excl`: Labeled as "Unit Price", "Unit Price Ex GST", or calculate: `line_total_excl / order_quantity`
+- `order_unit_tax`: If not labeled, calculate: `line_total_tax / order_quantity`
+- `order_unit_price_incl`: If not labeled, calculate: `order_unit_price_excl + order_unit_tax`
+- `gst_indicator`: Return "GST" if `order_unit_tax > 0`, otherwise "NO GST"
+
+===============================
+SPECIAL CONDITIONS
+===============================
+
+Exclude the following items from `Line_Items` and handle separately:
 
 - If `product_name` or description contains **"Freight"** or **"Fuel Levy"**:
-  - Set `"shipping_cost"` to the Net Value (excluding GST), or `0.0` if not found.
+  - Set `"shipping_cost"` to the line total excluding GST, or `0.0` if not found.
 
 - If it contains **"Case Rate"**:
-  - Set `"picking_charge"` to the Net Value, or `0.0` if not found.
+  - Set `"picking_charge"` to the line total excluding GST, or `0.0` if not found.
 
 - If it contains **"Direct Debit Incentive"** or **"Minimum Order Qty Incentive"**:
-  - Set `"discount_amount"` to the Net Value, or `0.0` if not found.
+  - Set `"discount_amount"` to the line total excluding GST, or `0.0` if not found.
 
-===== OUTPUT FORMAT =====
-Always return a valid JSON object in the following structure:
+These excluded items must not be included in `Line_Items`.
+
+===============================
+JSON OUTPUT FORMAT
+===============================
+
+Return only the following structured JSON:
 
 ```json
 {{
@@ -111,7 +131,8 @@ Always return a valid JSON object in the following structure:
       "order_unit_tax": "",
       "gst_indicator": "",
       "line_total_excl": "",
-      "line_total_incl": ""
+      "line_total_incl": "",
+      "line_total_tax": ""
     }}
   ],
   "discount_amount": "",

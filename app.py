@@ -11,7 +11,12 @@ from helper import (
     normalize_line_items
 )
 from dotenv import load_dotenv
+from google.oauth2 import service_account
 from langchain_google_genai import ChatGoogleGenerativeAI
+
+# Load credentials from Streamlit secrets
+# service_account_info = json.loads(st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
+# credentials = service_account.Credentials.from_service_account_info(service_account_info)
 
 # Load Google API Key from .env
 load_dotenv()
