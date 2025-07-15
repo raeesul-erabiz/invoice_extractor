@@ -26,7 +26,7 @@ llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GOOGLE_API
 
 # Set page config
 st.set_page_config(page_title="📄 Multi-Invoice Processor", layout="centered")
-st.title("📄 Upload and Process Multiple Invoices")
+st.title("📄 Upload Supplier Invoices")
 
 # File uploader (multiple files)
 uploaded_files = st.file_uploader("Upload one or more PDF invoices", type=["pdf"], accept_multiple_files=True)
