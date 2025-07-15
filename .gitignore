@@ -1,0 +1,9 @@
+.env
+Responses.zip
+test.py
+prompt.txt
+__pycache__
+
+# Ignore temp folders
+temp_docs/
+results/
