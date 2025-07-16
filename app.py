@@ -27,10 +27,29 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set up Gemini model
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY)
+# llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GOOGLE_API_KEY)
 
 # Set page config
-st.set_page_config(page_title="📄 Multi-Invoice Processor", layout="centered")
+st.set_page_config(page_title="📄 Multi-Invoice Processor", 
+                   layout="wide", 
+                   initial_sidebar_state="expanded")
+
+with st.sidebar:
+    st.header("⚙️ Configuration")
+
+    # API Key input
+    api_key = st.text_input(
+        "Google AI API Key",
+        type="password",
+        help="Enter your Google AI API key"
+    )
+            
+    if api_key:
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
+        st.success("✅ API Key configured")
+    else:
+        st.warning("⚠️ Please enter your API key")
+                
 st.title("📄 Upload Supplier Invoices")
 
 # File uploader (multiple files)

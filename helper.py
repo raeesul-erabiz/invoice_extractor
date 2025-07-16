@@ -67,8 +67,8 @@ def extract_pack_details(data: Dict[str, Any]) -> Dict[str, Any]:
 
                 elif pattern_type == 'gm_raw_pattern':
                     order_unit_size = int(match.group(1))
-                    pack_size = float(match.group(2))
-                    pack_unit = 'GM'
+                    pack_size = float(match.group(2)) / 1000 # GM → KG
+                    pack_unit = 'KG'
 
                 elif pattern_type == 'pk_pattern':
                     order_unit_size = int(match.group(1))

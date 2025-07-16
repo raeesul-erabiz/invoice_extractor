@@ -61,14 +61,14 @@ HEADER FIELDS
 Extract the following from the invoice header or summary section:
 
 - `supplier_name`: Usually near the top or next to "TAX INVOICE".
-- `store_name`: Found under or near "Ship To:" or delivery address.
+- `store_name`: Found under or near "Ship To:", "Invoice To:" or delivery address.
 - `invoice_number`: Labeled as "Invoice", "Invoice No", "Invoice Nr", etc.
 - `invoice_date`: The invoice issue date.
 - `due_date`: If a specific date is present, return it. If not, and there is a "Due in X days" or similar (e.g., "Terms: 14 Days"), calculate: `due_date = invoice_date + due days`.
-- `purchase_order`: Labeled as "PO", "Purchase Order", "Reference", or "Order No".
+- `purchase_order`: Labeled as "PO", "Purchase Order", "Reference", "Order Ref", or "Order No".
 - `total_amount`: Total amount **including GST**, labeled as "INVOICE TOTAL (GST Incl.)", "TOTAL DUE", or "TOTAL AMOUNT".
 - `total_tax`: Labeled as "TOTAL GST", "GST Amount", or "Total GST Included".
-- `total_excl_tax`: If labeled (e.g., "Net Line Total", "Total Excl. GST"), extract the value. If not found, but both **"TAXABLE ITEM TOTAL"** and **"NON-TAXABLE ITEM TOTAL"** are available, calculate: `total_excl_tax = TAXABLE ITEM TOTAL + NON-TAXABLE ITEM TOTAL` Otherwise, calculate: `total_excl_tax = total_amount - total_tax`
+- `total_excl_tax`: If labeled (e.g., "Net Line Total", "Total Excl. GST", "SUB TOTAL"), extract the value. If not found, but both **"TAXABLE ITEM TOTAL"** and **"NON-TAXABLE ITEM TOTAL"** are available, calculate: `total_excl_tax = TAXABLE ITEM TOTAL + NON-TAXABLE ITEM TOTAL` Otherwise, calculate: `total_excl_tax = total_amount - total_tax`
 - `rounding`: If a "Rounding" field or adjustment is shown, include it.
 
 ===============================
@@ -77,7 +77,7 @@ LINE ITEM FIELDS
 
 For each product in the line items table:
 
-- `product_code`: Value under column labeled "Item No", "Item Code", "Product Code", "Code", or "Material No".
+- `product_code`: Value under column labeled "Item No", "Item Code", "Stock", "Product Code", "Code", or "Material No".
 - `product_name`: Return the full string from the "Description" or "Product" column exactly as shown.
 - `order_quantity`: From "Quantity", "Qty", "Qty Supplied", or "Sales Qty" column.
 - `order_unit`: Always return "CTN"
@@ -120,6 +120,13 @@ Return only the following structured JSON:
   "invoice_date": "",
   "due_date": "",
   "purchase_order": "",
+  "discount_amount": "",
+  "total_excl_tax": "",
+  "shipping_cost": "",
+  "total_tax": "",
+  "rounding": "",
+  "picking_charge": "",
+  "total_amount": "",
   "Line_Items": [
     {{
       "product_name": "",
@@ -134,14 +141,7 @@ Return only the following structured JSON:
       "line_total_incl": "",
       "line_total_tax": ""
     }}
-  ],
-  "discount_amount": "",
-  "total_excl_tax": "",
-  "shipping_cost": "",
-  "total_tax": "",
-  "rounding": "",
-  "picking_charge": "",
-  "total_amount": ""
+  ]
 }}
 
 Here is the invoice text:
