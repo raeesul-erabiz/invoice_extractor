@@ -4,6 +4,7 @@ Responses.zip
 test.py
 prompt.txt
 __pycache__
+testing.ipynb
 
 # Ignore temp folders
 temp_docs/

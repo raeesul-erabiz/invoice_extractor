@@ -3,13 +3,8 @@ import json
 import time
 import logging
 import streamlit as st
-from invoice_extractor import extract_text_from_pdf, extract_invoice_data
-from helper import (
-    extract_pack_details,
-    add_item_count,
-    normalize_financial_fields,
-    normalize_line_items
-)
+from invoice_extractor import InvoiceExtractor
+from helper import InvoiceHelper
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -28,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 # Set up Gemini model
 # llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GOOGLE_API_KEY)
+
+# calling classes
+extractor = InvoiceExtractor()
+handler = InvoiceHelper()
 
 # Set page config
 st.set_page_config(page_title="📄 Multi-Invoice Processor", 
@@ -61,9 +60,9 @@ os.makedirs("results", exist_ok=True)
 
 # Process button
 if uploaded_files and st.button("🚀 Process Invoices"):
-    logging.info(f"Received {len(uploaded_files)} Invoices")
+    logger.info(f"Received {len(uploaded_files)} Invoices")
     for uploaded_file in uploaded_files:
-        logging.info(f"======================================")
+        logger.info(f"==========Processing {uploaded_file.name}=============")
         with st.spinner(f"Processing {uploaded_file.name}..."):
 
             # Save file to temp folder
@@ -76,29 +75,50 @@ if uploaded_files and st.button("🚀 Process Invoices"):
             json_path = os.path.join("results", json_filename)
 
             # Step 1: Extract raw text
-            extracted_text = extract_text_from_pdf(file_path)
+            # extracted_text = extract_text_from_pdf(file_path)
+            # logger.info(f"Extracted Text: {extracted_text}")
+
+            extracted_text = extractor.extract_text_from_pdf_pymupdf(file_path)
+            # logger.info(f"Extracted Text: {extracted_text}")
 
             # Step 2: LLM for structured data
             start = time.time()
-            structured_data = extract_invoice_data(extracted_text, llm)
+            structured_data = extractor.extract_invoice_data(extracted_text, llm)
             elapsed = round(time.time() - start, 2)
-            logging.info(f"✅ LLM extraction completed in {elapsed}s")
+            logger.info(f"LLM extraction completed in {elapsed}s")
+            # print(structured_data)
 
             # Step 3: Post-processing
-            updated_data = extract_pack_details(structured_data)
+            updated_data = handler.extract_pack_details(structured_data)
 
-            updated_data = add_item_count(updated_data)
+            updated_data = handler.add_item_count(updated_data)
 
-            updated_data = normalize_financial_fields(updated_data)
+            updated_data = handler.calculate_missing_fields(updated_data)
 
-            updated_data = normalize_line_items(updated_data)
+            # Apply only for "Anchor Packaging"
+            if updated_data.get("supplier_name", "").strip().lower() == "anchor packaging":
+                updated_data = handler.recalculate_anchor_packaging_gst(updated_data)
+
+            # Replace Supplier Name
+            if updated_data.get('supplier_name') == 'Plum SCH':
+                updated_data['supplier_name'] = 'LifeGrain Central Kitchen'
+
+            updated_data = handler.normalize_financial_fields(updated_data)
+
+            updated_data = handler.normalize_line_items(updated_data)
+
+            # updated_data = handler.validate_and_correct_line_totals(updated_data)
+
+            updated_data = handler.recalculate_totals_and_variances(updated_data)
+
+            updated_data = handler.reorder_invoice_data(updated_data)
 
             # Step 4: Save JSON
             with open(json_path, "w") as f:
                 json.dump(updated_data, f, indent=4)
 
             # Step 5: Display results
-            logging.info(f"✅ Processed and saved: `results/{json_filename}`")
+            logger.info(f"Processed and saved: `results/{json_filename}`")
             st.download_button(
                 label="📥 Download JSON",
                 data=json.dumps(updated_data, indent=4),
@@ -109,4 +129,4 @@ if uploaded_files and st.button("🚀 Process Invoices"):
 
             with st.expander(f"📋 View Extracted Data for `{uploaded_file.name}`"):
                 st.json(updated_data)
-        logging.info(f"======================================")
+        logger.info(f"======================================")
