@@ -27,8 +27,13 @@ class InvoiceHelper:
                 incl = item.get("line_total_incl")
                 tax = item.get("line_total_tax")
                 qty = item.get("order_quantity")
+                price_quantity = item.get("price/quantity")
                 # unit_excl = item.get("order_unit_price_excl")
                 # self.logger.info(f"extracted tax: {type(tax)}")
+
+                if excl is not None and isinstance(excl, str) and "$" in excl:
+                    # Handle dollar values like $3.79 or $23.85 - use exact value without $
+                    excl = float(excl.strip('$'))
 
                 # Convert to float with proper None handling
                 excl = float(excl) if excl is not None else 0
@@ -36,10 +41,41 @@ class InvoiceHelper:
                 qty = float(qty) if qty is not None else 1
                 # unit_excl = float(unit_excl) if unit_excl is not None else 0
 
+                # Calculate new quantity if price/quantity is not null
+                if price_quantity is not None and excl != 0:
+                    try:
+                        # Handle string format like '$37.90 / 1000'
+                        if isinstance(price_quantity, str):
+                            # Remove currency symbols and spaces
+                            cleaned = price_quantity.replace('$', '').replace(' ', '')
+                            # Split by '/' and calculate the division
+                            if '/' in cleaned:
+                                parts = cleaned.split('/')
+                                if len(parts) == 2:
+                                    numerator = float(parts[0])
+                                    denominator = float(parts[1])
+                                    price_quantity_value = numerator / denominator
+                                else:
+                                    price_quantity_value = float(cleaned)
+                            else:
+                                price_quantity_value = float(cleaned)
+                        else:
+                            price_quantity_value = float(price_quantity)
+                        
+                        qty = qty * price_quantity_value / excl
+                        item["order_quantity"] = qty
+
+                    except (ValueError, ZeroDivisionError) as e:
+                        self.logger.warning(f"Could not process price/quantity '{price_quantity}': {e}")
+                        # Continue with original qty if conversion fails
+
                 # Determine line_total_tax
                 if tax is not None and isinstance(tax, str) and "%" in tax:
                     tax_pct = float(tax.strip('%'))
                     tax_amt = excl * tax_pct / 100
+                elif tax is not None and isinstance(tax, str) and "$" in tax:
+                    # Handle dollar values like $3.79 or $23.85 - use exact value without $
+                    tax_amt = float(tax.strip('$'))
                 elif tax is not None and isinstance(tax, str):
                     tax_value = float(tax)
                     # If it's an integer (whole number), treat as percentage
@@ -75,6 +111,9 @@ class InvoiceHelper:
                 unit_excl = round(excl / qty, 4) if qty != 0 else 0
                 unit_incl = round(unit_excl + unit_tax, 4)
                 gst_indicator = "GST" if unit_tax > 0 else "NO GST"
+
+                if item.get("order_unit") in [None, ""]:
+                    item["order_unit"] = "EA"
 
                 # Update line item fields
                 item["line_total_excl"] = excl
@@ -122,117 +161,138 @@ class InvoiceHelper:
         ]
 
         for item in data.get("Line_Items", []):
-            product_name = item.get("product_name", "")
-            order_unit_size, pack_unit, pack_size = None, None, None
+            price_quantity = item.get("price/quantity")
+            # Calculate new quantity if price/quantity is not null
+            if price_quantity is not None:
+                try:
+                    # Handle string format like '$37.90 / 1000'
+                    if isinstance(price_quantity, str):
+                        # Remove currency symbols and spaces
+                        cleaned = price_quantity.replace('$', '').replace(' ', '')
+                        # Split by '/' and calculate the division
+                        if '/' in cleaned:
+                            parts = cleaned.split('/')
+                            if len(parts) == 2:
+                                pack_size = float(parts[1])
+                                pack_unit = "EA"
+                                order_unit_size = 1.0
 
-            for pattern, pattern_type in pack_patterns:
-                match = re.search(pattern, product_name, re.IGNORECASE)
-                if match:
-                    if pattern_type == 'qtyxsize_unit':
-                        order_unit_size = int(match.group(1))
-                        pack_size = float(match.group(2))
-                        unit = match.group(3).upper()
-                        pack_unit = (
-                            'KG' if unit in ['K', 'KG']
-                            else 'L' if unit in ['ML', 'L']
-                            else 'EA' if unit in ['PC', 'EA']
-                            else unit
-                        )
-                        if unit == 'G':
-                            pack_size /= 1000
+                except (ValueError, ZeroDivisionError) as e:
+                    self.logger.warning(f"Could not process price/quantity '{price_quantity}': {e}")
+                    # Continue with original qty if conversion fails
+            
+            else:
+                product_name = item.get("product_name", "")
+                order_unit_size, pack_unit, pack_size = None, None, None
+
+                for pattern, pattern_type in pack_patterns:
+                    match = re.search(pattern, product_name, re.IGNORECASE)
+                    if match:
+                        if pattern_type == 'qtyxsize_unit':
+                            order_unit_size = int(match.group(1))
+                            pack_size = float(match.group(2))
+                            unit = match.group(3).upper()
+                            pack_unit = (
+                                'KG' if unit in ['K', 'KG']
+                                else 'L' if unit in ['ML', 'L']
+                                else 'EA' if unit in ['PC', 'EA']
+                                else unit
+                            )
+                            if unit == 'G':
+                                pack_size /= 1000
+                                pack_unit = 'KG'
+                            elif unit == 'ML':
+                                pack_size /= 1000
+                                pack_unit = 'L'
+
+                        elif pattern_type == 'gm_raw_pattern':
+                            order_unit_size = int(match.group(1))
+                            pack_size = float(match.group(2)) / 1000 # GM → KG
                             pack_unit = 'KG'
-                        elif unit == 'ML':
-                            pack_size /= 1000
-                            pack_unit = 'L'
 
-                    elif pattern_type == 'gm_raw_pattern':
-                        order_unit_size = int(match.group(1))
-                        pack_size = float(match.group(2)) / 1000 # GM → KG
-                        pack_unit = 'KG'
+                        elif pattern_type == 'spaced_qtyxsize_unit':
+                            order_unit_size = int(match.group(1))
+                            pack_size = float(match.group(2))
+                            unit_raw = match.group(3).upper()
 
-                    elif pattern_type == 'spaced_qtyxsize_unit':
-                        order_unit_size = int(match.group(1))
-                        pack_size = float(match.group(2))
-                        unit_raw = match.group(3).upper()
+                            # Normalize the unit to standard form
+                            if unit_raw in ["LT", "LTR", "LITRE", "LITRES"]:
+                                pack_unit = "L"
+                            elif unit_raw in ["ML", "MILLILITRE", "MILLILITRES"]:
+                                pack_size /=1000
+                                pack_unit = "L"
+                            elif unit_raw in ["KG", "KGS", "KILOGRAM"]:
+                                pack_unit = "KG"
+                            elif unit_raw in ["G", "GM", "GRAM", "GRAMS"]:
+                                pack_size /=1000
+                                pack_unit = "KG"
+                            elif unit_raw in ["PC", "PCS", "EA", "EACH"]:
+                                pack_unit = "EA"
+                            else:
+                                pack_unit = unit_raw  # fallback if new/unknown
 
-                        # Normalize the unit to standard form
-                        if unit_raw in ["LT", "LTR", "LITRE", "LITRES"]:
+                        elif pattern_type == 'pk_pattern':
+                            order_unit_size = int(match.group(1))
+                            pack_size = float(match.group(3))
+                            pack_unit = 'EA'
+
+                        elif pattern_type in ['kg_pattern', 'g_pattern', 'ml_pattern', 'l_pattern']:
+                            pack_size = float(match.group(1))
+                            unit = match.group(2).upper()
+                            order_unit_size = int(match.group(3))
+
+                            if unit == 'G':
+                                pack_size /= 1000
+                                pack_unit = 'KG'
+                            elif unit == 'ML':
+                                pack_size /= 1000
+                                pack_unit = 'L'
+                            elif unit == 'K':
+                                pack_unit = 'KG'
+                            elif unit == 'L':
+                                pack_unit = 'L'
+                            else:
+                                pack_unit = unit
+                            
+                        elif pattern_type == 'ml_pack_bottle_pattern':
+                            pack_size = float(match.group(1)) / 1000  # convert ml to L
                             pack_unit = "L"
-                        elif unit_raw in ["ML", "MILLILITRE", "MILLILITRES"]:
-                            pack_size /=1000
-                            pack_unit = "L"
-                        elif unit_raw in ["KG", "KGS", "KILOGRAM"]:
-                            pack_unit = "KG"
-                        elif unit_raw in ["G", "GM", "GRAM", "GRAMS"]:
-                            pack_size /=1000
-                            pack_unit = "KG"
-                        elif unit_raw in ["PC", "PCS", "EA", "EACH"]:
-                            pack_unit = "EA"
-                        else:
-                            pack_unit = unit_raw  # fallback if new/unknown
+                            order_unit_size = int(match.group(3))
 
-                    elif pattern_type == 'pk_pattern':
-                        order_unit_size = int(match.group(1))
-                        pack_size = float(match.group(3))
-                        pack_unit = 'EA'
+                        elif pattern_type in ['kg_single', 'g_single', 'ml_single', 'l_single']:
+                            pack_size = float(match.group(1))
+                            unit = match.group(2).upper()
+                            order_unit_size = 1
 
-                    elif pattern_type in ['kg_pattern', 'g_pattern', 'ml_pattern', 'l_pattern']:
-                        pack_size = float(match.group(1))
-                        unit = match.group(2).upper()
-                        order_unit_size = int(match.group(3))
-
-                        if unit == 'G':
-                            pack_size /= 1000
-                            pack_unit = 'KG'
-                        elif unit == 'ML':
-                            pack_size /= 1000
-                            pack_unit = 'L'
-                        elif unit == 'K':
-                            pack_unit = 'KG'
-                        elif unit == 'L':
-                            pack_unit = 'L'
-                        else:
-                            pack_unit = unit
+                            if unit == 'G':
+                                pack_size /= 1000
+                                pack_unit = 'KG'
+                            elif unit == 'ML':
+                                pack_size /= 1000
+                                pack_unit = 'L'
+                            elif unit == 'K':
+                                pack_unit = 'KG'
+                            elif unit == 'L':
+                                pack_unit = 'L'
+                            else:
+                                pack_unit = unit
                         
-                    elif pattern_type == 'ml_pack_bottle_pattern':
-                        pack_size = float(match.group(1)) / 1000  # convert ml to L
-                        pack_unit = "L"
-                        order_unit_size = int(match.group(3))
+                        elif pattern_type == 'count_pattern':
+                            order_unit_size = int(match.group(1))
+                            pack_size = float(match.group(2))
+                            pack_unit = 'EA'
 
-                    elif pattern_type in ['kg_single', 'g_single', 'ml_single', 'l_single']:
-                        pack_size = float(match.group(1))
-                        unit = match.group(2).upper()
-                        order_unit_size = 1
+                        elif pattern_type == 'numeric_quantity_prefix':
+                            order_unit_size = 1
+                            pack_size = 1.0
+                            pack_unit = 'EA'
+                        
+                        elif pattern_type == 'pk_only_pattern':
+                            order_unit_size = int(match.group(1))
+                            pack_size = 1.0
+                            pack_unit = 'EA'
 
-                        if unit == 'G':
-                            pack_size /= 1000
-                            pack_unit = 'KG'
-                        elif unit == 'ML':
-                            pack_size /= 1000
-                            pack_unit = 'L'
-                        elif unit == 'K':
-                            pack_unit = 'KG'
-                        elif unit == 'L':
-                            pack_unit = 'L'
-                        else:
-                            pack_unit = unit
-                    
-                    elif pattern_type == 'count_pattern':
-                        order_unit_size = int(match.group(1))
-                        pack_size = float(match.group(2))
-                        pack_unit = 'EA'
-
-                    elif pattern_type == 'numeric_quantity_prefix':
-                        order_unit_size = 1
-                        pack_size = 1.0
-                        pack_unit = 'EA'
-                    
-                    elif pattern_type == 'pk_only_pattern':
-                        order_unit_size = int(match.group(1))
-                        pack_size = 1.0
-                        pack_unit = 'EA'
-
-                    break  # Exit loop after the first matching pattern
+                        break  # Exit loop after the first matching pattern
 
             # Set extracted values or default empty
             item["order_unit_size"] = order_unit_size if order_unit_size is not None else 1
@@ -241,6 +301,10 @@ class InvoiceHelper:
 
         return data
 
+    def remove_price_per_quantity_field(data: dict) -> dict:
+        for item in data.get("Line_Items", []):
+            item.pop("price/quantity", None)  # Safely remove if it exists
+        return data
 
     def normalize_line_items(self, data: Dict[str, Any]) -> Dict[str, Any]:
         self.logger.info("Normalizing line item fields...")
@@ -311,6 +375,7 @@ class InvoiceHelper:
         # Reorder line items if present
         reordered_items = []
         for item in data.get("Line_Items", []):
+            item.pop("price/quantity", None)  # Safely remove if it exists
             reordered_item = OrderedDict()
             for key in line_item_order:
                 if key in item:
@@ -364,6 +429,47 @@ class InvoiceHelper:
                 item["gst_indicator"] = "GST"
             except Exception as e:
                 print(f"Error processing item: {item}\n{e}")
+
+        return data
+
+    def reconcile_published_totals(self, data: dict, precision: int = 2) -> dict:
+        self.logger.info("Re-Calculating Published Totals of PNM SYDNEY PTY LTD...")
+        # 1️⃣  Sum values from line items
+        line_items = data.get("Line_Items", [])
+        new_subtotal_excl = round(
+            sum(float(item.get("line_total_excl", 0)) for item in line_items),
+            precision,
+        )
+        new_gst_total = round(
+            sum(float(item.get("line_total_tax", 0)) for item in line_items),
+            precision,
+        )
+        new_total_incl = round(
+            sum(float(item.get("line_total_incl", 0)) for item in line_items),
+            precision,
+        )
+
+        # 2️⃣  Fetch any existing published values (default to 0)
+        published_subtotal_excl = round(float(data.get("published_subtotal_excl", 0)), precision)
+        published_gst_total     = round(float(data.get("published_gst_total", 0)), precision)
+        published_total_incl    = round(float(data.get("published_total_incl", 0)), precision)
+
+        # 3️⃣  Decide which values to keep
+        data["published_subtotal_excl"] = (
+            published_subtotal_excl
+            if published_subtotal_excl == new_subtotal_excl
+            else new_subtotal_excl
+        )
+        data["published_gst_total"] = (
+            published_gst_total
+            if published_gst_total == new_gst_total
+            else new_gst_total
+        )
+        data["published_total_incl"] = (
+            published_total_incl
+            if published_total_incl == new_total_incl
+            else new_total_incl
+        )
 
         return data
 

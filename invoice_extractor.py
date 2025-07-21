@@ -92,8 +92,8 @@ Extract the following from the invoice header or summary section:
 - `due_date`: If a specific date is present, return it. If not, and there is a "Due in X days" or similar (e.g., "Terms: 14 Days"), calculate: `due_date = invoice_date + due days`.
 - `purchase_order`: Labeled as "PO", "Purchase Order", "Reference", "Customer Order No", "Order Ref", or "Order No".
 - `published_total_incl`: Total amount **including GST**, labeled as "INVOICE TOTAL (GST Incl.)", "TOTAL DUE", or "TOTAL AMOUNT".
-- `published_gst_total`: Labeled as "TOTAL GST", "GST Amount", or "Total GST Included".
-- `published_subtotal_excl`: If labeled (e.g., "Net Line Total", "Total Excl. GST", "SUB TOTAL"), extract the value. If not found, but both **"TAXABLE ITEM TOTAL"** and **"NON-TAXABLE ITEM TOTAL"** are available, calculate: `published_subtotal_excl = TAXABLE ITEM TOTAL + NON-TAXABLE ITEM TOTAL` Otherwise, calculate: `published_subtotal_excl = published_total_incl - published_gst_total`
+- `published_gst_total`: Labeled as "TOTAL GST", "GST", "GST Amount", or "Total GST Included".
+- `published_subtotal_excl`: If labeled (e.g., "Net Line Total", "Total Excl. GST", "SUB TOTAL"), extract the value. If not found, but both **"TAXABLE ITEM TOTAL"** and **"NON-TAXABLE ITEM TOTAL"** are available, calculate: `published_subtotal_excl = TAXABLE ITEM TOTAL + NON-TAXABLE ITEM TOTAL`.
 - `rounding`: If a "Rounding" field or adjustment is shown, include it.
 
 ===============================
@@ -105,6 +105,7 @@ For each product in the line items table:
 - `product_code`: A numeric or alphanumeric value found in the product code column (e.g., "No.", "Item No", "Item Code", "Stock", "Product Code", "Code", "Material No", etc.). Must be extracted **separately** from the description.
 - `product_name`: Return the full string from the "Description" or "Product" column exactly as shown.
 - `order_quantity`: From "Quantity", "Qty", "Qty Supplied", or "Sales Qty" column.
+- `price/quantity`: Extract the value from a column labeled "PRICE / QTY".
 - `order_unit`: Extract the value under the "Unit" or "UOM" column (e.g., Bottle, Box, Ctn, Pack, etc.). If no unit value is found, return default value "Ctn".
 - `line_total_excl`: Extract value from a column labeled "Net Value", "Ex. GST Amount", "Total Amt Ex GST", "Extended Price IncL CDS excl GST", or similar.
 - `line_total_tax`: Extract the raw tax value for each line item from any of the following columns (if present): **"GST"**, **"GST Amt"**, **"Tax Amount"**, **"Tax Rate"**, **"GST Rate"**, **"GST %"**, or **"Tax %"**.  
@@ -156,6 +157,7 @@ Return only the following structured JSON:
       "product_code": "",
       "product_name": "",
       "order_quantity": "",
+      "price/quantity": "",
       "order_unit": "",
       "line_total_excl": "",
       "line_total_incl": "",

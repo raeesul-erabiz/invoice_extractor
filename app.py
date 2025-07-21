@@ -103,6 +103,10 @@ if uploaded_files and st.button("🚀 Process Invoices"):
             if updated_data.get('supplier_name') == 'Plum SCH':
                 updated_data['supplier_name'] = 'LifeGrain Central Kitchen'
 
+            # Apply only for "PNM SYDNEY PTY LTD"
+            if updated_data.get("supplier_name", "").strip().lower() == "pnm sydney pty ltd":
+                updated_data = handler.reconcile_published_totals(updated_data)
+
             updated_data = handler.normalize_financial_fields(updated_data)
 
             updated_data = handler.normalize_line_items(updated_data)
