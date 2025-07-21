@@ -1,6 +1,7 @@
 streamlit
 pdfplumber
 fitz
+PyMuPDF
 python-dotenv
 langchain
 langchain-google-genai
