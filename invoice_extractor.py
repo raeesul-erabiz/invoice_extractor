@@ -104,8 +104,8 @@ For each product in the line items table:
 
 - `product_code`: A numeric or alphanumeric value found in the product code column (e.g., "No.", "Item No", "Item Code", "Stock", "Product Code", "Code", "Material No", etc.). Must be extracted **separately** from the description.
 - `product_name`: Return the full string from the "Description" or "Product" column exactly as shown.
-- `order_quantity`: From "Quantity", "Qty", "Qty Supplied", or "Sales Qty" column.
-- `price/quantity`: Extract the value from a column labeled "PRICE / QTY".
+- `order_quantity`: Extract the value only from a properly labeled column such as **"Quantity"**, **"Qty"**, **"Qty Supplied"**, **"Ordered"**, **"Inv Qty"**, or **"Sales Qty"**. Do not extract numeric values from product descriptions, item names, or nearby fields unless they are clearly under one of the specified column headers. 
+- `price/quantity`: Extract the value **only if** there is a column explicitly labeled "PRICE / QTY". Do not infer or calculate this value from any other field. If the column "PRICE / QTY" does not exist or the value is missing, return this field as empty.
 - `order_unit`: Extract the value under the "Unit" or "UOM" column (e.g., Bottle, Box, Ctn, Pack, etc.). If no unit value is found, return default value "Ctn".
 - `line_total_excl`: Extract value from a column labeled "Net Value", "Ex. GST Amount", "Total Amt Ex GST", "Extended Price IncL CDS excl GST", or similar.
 - `line_total_tax`: Extract the raw tax value for each line item from any of the following columns (if present): **"GST"**, **"GST Amt"**, **"Tax Amount"**, **"Tax Rate"**, **"GST Rate"**, **"GST %"**, or **"Tax %"**.  

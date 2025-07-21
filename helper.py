@@ -20,7 +20,7 @@ class InvoiceHelper:
         self.logger.info("Extracting pack details...")
         for item in data.get("Line_Items", []):
             try:
-                # self.logger.info(f"{item.get('product_name')}: {item.get('line_total_excl')}, {item.get('line_total_incl')}, {item.get('line_total_tax')}, {item.get('order_quantity')}")
+                # self.logger.info(f"{item.get('product_name')}: {item.get('line_total_excl')}, {item.get('line_total_incl')}, {item.get('line_total_tax')}, {item.get('order_quantity')}, {item.get('price/quantity')}")
                 
                 # Handle None values properly
                 excl = item.get("line_total_excl")
@@ -41,9 +41,9 @@ class InvoiceHelper:
                 qty = float(qty) if qty is not None else 1
                 # unit_excl = float(unit_excl) if unit_excl is not None else 0
 
-                # Calculate new quantity if price/quantity is not null
-                if price_quantity is not None and excl != 0:
-                    try:
+                if data.get("supplier_name", "").strip().lower() == "pnm sydney pty ltd":
+                    # Calculate new quantity if price/quantity is not null
+                    if price_quantity is not None and excl != 0:
                         # Handle string format like '$37.90 / 1000'
                         if isinstance(price_quantity, str):
                             # Remove currency symbols and spaces
@@ -61,13 +61,9 @@ class InvoiceHelper:
                                 price_quantity_value = float(cleaned)
                         else:
                             price_quantity_value = float(price_quantity)
-                        
+                            
                         qty = qty * price_quantity_value / excl
                         item["order_quantity"] = qty
-
-                    except (ValueError, ZeroDivisionError) as e:
-                        self.logger.warning(f"Could not process price/quantity '{price_quantity}': {e}")
-                        # Continue with original qty if conversion fails
 
                 # Determine line_total_tax
                 if tax is not None and isinstance(tax, str) and "%" in tax:
@@ -161,10 +157,11 @@ class InvoiceHelper:
         ]
 
         for item in data.get("Line_Items", []):
-            price_quantity = item.get("price/quantity")
-            # Calculate new quantity if price/quantity is not null
-            if price_quantity is not None:
-                try:
+            if data.get("supplier_name", "").strip().lower() == "pnm sydney pty ltd":
+                price_quantity = item.get("price/quantity")
+                # Calculate new quantity if price/quantity is not null
+                if price_quantity is not None:
+                    order_unit_size, pack_unit, pack_size = None, None, None
                     # Handle string format like '$37.90 / 1000'
                     if isinstance(price_quantity, str):
                         # Remove currency symbols and spaces
@@ -176,11 +173,12 @@ class InvoiceHelper:
                                 pack_size = float(parts[1])
                                 pack_unit = "EA"
                                 order_unit_size = 1.0
+                        
+                    # Set extracted values or default empty
+                    item["order_unit_size"] = order_unit_size
+                    item["pack_size"] = pack_size
+                    item["pack_unit"] = pack_unit
 
-                except (ValueError, ZeroDivisionError) as e:
-                    self.logger.warning(f"Could not process price/quantity '{price_quantity}': {e}")
-                    # Continue with original qty if conversion fails
-            
             else:
                 product_name = item.get("product_name", "")
                 order_unit_size, pack_unit, pack_size = None, None, None
@@ -294,10 +292,10 @@ class InvoiceHelper:
 
                         break  # Exit loop after the first matching pattern
 
-            # Set extracted values or default empty
-            item["order_unit_size"] = order_unit_size if order_unit_size is not None else 1
-            item["pack_size"] = pack_size if pack_size is not None else 1.0
-            item["pack_unit"] = pack_unit if pack_unit is not None else 'EA'
+                # Set extracted values or default empty
+                item["order_unit_size"] = order_unit_size if order_unit_size is not None else 1
+                item["pack_size"] = pack_size if pack_size is not None else 1.0
+                item["pack_unit"] = pack_unit if pack_unit is not None else 'EA'
 
         return data
 
@@ -412,18 +410,26 @@ class InvoiceHelper:
             try:
                 # Required input fields
                 line_total_excl = float(item.get("line_total_excl", 0))
-                order_quantity = float(item.get("order_quantity", 1))  # avoid division by zero
-                order_unit_price_excl = float(item.get("order_unit_price_excl", 0))
+                # order_quantity = float(item.get("order_quantity", 1))  # avoid division by zero
+                # order_unit_price_excl = float(item.get("order_unit_price_excl", 0))
+                unit = item.get("order_unit")
+                unit = float(unit) if unit is not None else 1
 
                 # Calculations
                 line_total_tax = round(line_total_excl * 0.10, 2)
                 line_total_incl = round(line_total_excl + line_total_tax, 2)
+                order_quantity = unit
+                unit = "EA"
                 order_unit_tax = round(line_total_tax / order_quantity, 4)
+                order_unit_price_excl = round(line_total_excl / order_quantity, 4)
                 order_unit_price_incl = round(order_unit_price_excl + order_unit_tax, 4)
 
                 # Assign back to item
                 item["line_total_tax"] = line_total_tax
                 item["line_total_incl"] = line_total_incl
+                item["order_quantity"] = order_quantity
+                item["order_unit"] = unit
+                item["order_unit_price_excl"] = order_unit_price_excl
                 item["order_unit_tax"] = order_unit_tax
                 item["order_unit_price_incl"] = order_unit_price_incl
                 item["gst_indicator"] = "GST"
