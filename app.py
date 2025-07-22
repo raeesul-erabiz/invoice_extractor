@@ -75,18 +75,30 @@ if uploaded_files and st.button("🚀 Process Invoices"):
             json_path = os.path.join("results", json_filename)
 
             # Step 1: Extract raw text
-            # extracted_text = extract_text_from_pdf(file_path)
+            extracted_text = extractor.extract_text_from_pdf(file_path)
             # logger.info(f"Extracted Text: {extracted_text}")
 
-            extracted_text = extractor.extract_text_from_pdf_pymupdf(file_path)
-            # logger.info(f"Extracted Text: {extracted_text}")
+            if "LifeGrainCentralPtyLtd" in extracted_text:
+                extracted_text = extractor.extract_text_from_pdf_pymupdf(file_path)
+                # logger.info(f"Extracted Text: {extracted_text}")
 
             # Step 2: LLM for structured data
             start = time.time()
             structured_data = extractor.extract_invoice_data(extracted_text, llm)
             elapsed = round(time.time() - start, 2)
             logger.info(f"LLM extraction completed in {elapsed}s")
-            # print(structured_data)
+            print(structured_data)
+
+            if "Allpress Espresso" in extracted_text:
+                new_extracted_text = extractor.extract_text_from_pdf_pymupdf(file_path)
+                
+                start = time.time()
+                new_structured_data = extractor.extract_line_item_data(new_extracted_text, llm)
+                elapsed = round(time.time() - start, 2)
+                logger.info(f"LLM extraction completed in {elapsed}s")
+                # print(structured_data)
+
+                updated_data = handler.update_product_names(structured_data, new_structured_data)
 
             # Step 3: Post-processing
             updated_data = handler.extract_pack_details(structured_data)
@@ -96,7 +108,8 @@ if uploaded_files and st.button("🚀 Process Invoices"):
             updated_data = handler.calculate_missing_fields(updated_data)
 
             # Apply only for "Anchor Packaging"
-            if updated_data.get("supplier_name", "").strip().lower() == "anchor packaging":
+            supplier_name = (updated_data.get("supplier_name") or "").strip().casefold()
+            if supplier_name in {"tax invoice", "anchor packaging", "anchorpackaging.com.au"}:
                 updated_data = handler.recalculate_anchor_packaging_gst(updated_data)
 
             # Replace Supplier Name

@@ -18,6 +18,9 @@ class InvoiceHelper:
 
     def calculate_missing_fields(self, data: dict) -> dict:
         self.logger.info("Extracting pack details...")
+        if "Coca-Cola" in data.get("supplier_name"):
+            data["published_subtotal_excl"] = float(data.get("published_total_incl")) - float(data.get("published_gst_total"))
+
         for item in data.get("Line_Items", []):
             try:
                 # self.logger.info(f"{item.get('product_name')}: {item.get('line_total_excl')}, {item.get('line_total_incl')}, {item.get('line_total_tax')}, {item.get('order_quantity')}, {item.get('price/quantity')}")
@@ -404,21 +407,21 @@ class InvoiceHelper:
         # if data.get("supplier_name") != "anchorpackaging.com.au":
         #     return data  # No change needed
         
-        # data['supplier_name'] = "Anchor Packaging"
+        data['supplier_name'] = "Anchor Packaging"
 
         for item in data.get("Line_Items", []):
             try:
                 # Required input fields
                 line_total_excl = float(item.get("line_total_excl", 0))
-                # order_quantity = float(item.get("order_quantity", 1))  # avoid division by zero
+                order_quantity = float(item.get("order_quantity", 1))  # avoid division by zero
                 # order_unit_price_excl = float(item.get("order_unit_price_excl", 0))
-                unit = item.get("order_unit")
-                unit = float(unit) if unit is not None else 1
+                # unit = item.get("order_unit")
+                # unit = float(unit) if unit is not None else 1
 
                 # Calculations
                 line_total_tax = round(line_total_excl * 0.10, 2)
                 line_total_incl = round(line_total_excl + line_total_tax, 2)
-                order_quantity = unit
+                # order_quantity = unit
                 unit = "EA"
                 order_unit_tax = round(line_total_tax / order_quantity, 4)
                 order_unit_price_excl = round(line_total_excl / order_quantity, 4)
@@ -478,6 +481,27 @@ class InvoiceHelper:
         )
 
         return data
+    
+    def update_product_names(self, structured: dict, new_structured: dict) -> dict:
+        """
+        Replace product_name in `structured` where product_code matches in `new_structured`.
+        """
+        self.logger.info("Update product name of Allpress Espresso...")
+        # Build a lookup from new_structured by product_code
+        code_to_name = {
+            item.get("product_code"): item.get("product_name")
+            for item in new_structured.get("Line_Items", [])
+            if item.get("product_code") and item.get("product_name")
+        }
+
+        # Iterate and replace in structured
+        for item in structured.get("Line_Items", []):
+            code = item.get("product_code")
+            if code in code_to_name:
+                item["product_name"] = code_to_name[code]
+
+        return structured
+
 
     def recalculate_totals_and_variances(self, data: dict) -> dict:
         self.logger.info("Calculating Totals and Variances...")
