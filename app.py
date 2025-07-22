@@ -87,7 +87,7 @@ if uploaded_files and st.button("🚀 Process Invoices"):
             structured_data = extractor.extract_invoice_data(extracted_text, llm)
             elapsed = round(time.time() - start, 2)
             logger.info(f"LLM extraction completed in {elapsed}s")
-            print(structured_data)
+            # print(structured_data)
 
             if "Allpress Espresso" in extracted_text:
                 new_extracted_text = extractor.extract_text_from_pdf_pymupdf(file_path)
