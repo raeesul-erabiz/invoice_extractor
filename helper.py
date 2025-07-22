@@ -37,6 +37,10 @@ class InvoiceHelper:
                 if excl is not None and isinstance(excl, str) and "$" in excl:
                     # Handle dollar values like $3.79 or $23.85 - use exact value without $
                     excl = float(excl.strip('$'))
+                
+                if excl is not None and isinstance(excl, str) and "," in excl:
+                    # Handle comma-separated values like 1,256.02 - remove commas
+                    excl = float(excl.replace(',', ''))
 
                 # Convert to float with proper None handling
                 excl = float(excl) if excl is not None else 0
@@ -77,8 +81,12 @@ class InvoiceHelper:
                     tax_amt = float(tax.strip('$'))
                 elif tax is not None and isinstance(tax, str):
                     tax_value = float(tax)
+                    # Check if the original string contains a decimal point
+                    if "." in tax:
+                        # If it contains a decimal, treat as exact value (float)
+                        tax_amt = tax_value
                     # If it's an integer (whole number), treat as percentage
-                    if tax_value == int(tax_value):
+                    elif tax_value == int(tax_value):
                         tax_amt = excl * (tax_value / 100)
                     else:
                         # If it's a float, use exact value

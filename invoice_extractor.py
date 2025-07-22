@@ -109,7 +109,7 @@ For each product in the line items table:
 - `order_unit`: Extract the value under the "Unit" or "UOM" column (e.g., Bottle, Box, Ctn, Pack, etc.).
 - `line_total_excl`: Extract value from a column labeled "Net Value", "Ex. GST Amount", "Total Amt Ex GST", "Extended Price IncL CDS excl GST", or similar.
 - `line_total_tax`: Extract the raw tax value for each line item from any of the following columns (if present): **"GST"**, **"GST Amt"**, **"Tax Amount"**, **"Tax Rate"**, **"GST Rate"**, **"GST %"**, or **"Tax %"**.  
-  - Do not perform any calculations — only extract the value **exactly as shown**, even if it's a **percentage** (e.g., `10`, `10%`, or `0%`), or a numeric amount (e.g., `12.21`, `13.02`).  
+  - Do not perform any calculations — only extract the value **exactly as shown**, even if it's a **percentage** (e.g., `10`, `10%`, or `0%`), or a raw numeric amount (e.g., `12.21`, `13.02`, `26.04`, or similar).  
   - **Do not skip 0%** — return `"0%"` or `0` as-is if that's what appears in the invoice.  
   - If none of these columns exist, or no value is shown, leave this field empty.
 - `line_total_incl`: Extract value from a column labeled "Total Incl. GST", "Total incl Taxes", "Incl. GST Amount", or similar. Do not calculate this value.

@@ -113,7 +113,7 @@ if uploaded_files and st.button("🚀 Process Invoices"):
                 updated_data = handler.recalculate_anchor_packaging_gst(updated_data)
 
             # Replace Supplier Name
-            if updated_data.get('supplier_name') == 'Plum SCH':
+            if updated_data.get('supplier_name') in ['Plum SCH', 'Plume Liverpool', 'Lifegrain Liverpool Cafe', 'LifeGrain Central Pty Ltd']:
                 updated_data['supplier_name'] = 'LifeGrain Central Kitchen'
 
             # Apply only for "PNM SYDNEY PTY LTD"
