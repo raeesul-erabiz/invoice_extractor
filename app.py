@@ -74,61 +74,7 @@ if uploaded_files and st.button("🚀 Process Invoices"):
             json_filename = f"{base_filename}.json"
             json_path = os.path.join("results", json_filename)
 
-            # Step 1: Extract raw text
-            extracted_text = extractor.extract_text_from_pdf(file_path)
-            # logger.info(f"Extracted Text: {extracted_text}")
-
-            if "LifeGrainCentralPtyLtd" in extracted_text:
-                extracted_text = extractor.extract_text_from_pdf_pymupdf(file_path)
-                # logger.info(f"Extracted Text: {extracted_text}")
-
-            # Step 2: LLM for structured data
-            start = time.time()
-            structured_data = extractor.extract_invoice_data(extracted_text, llm)
-            elapsed = round(time.time() - start, 2)
-            logger.info(f"LLM extraction completed in {elapsed}s")
-            # print(structured_data)
-
-            if "Allpress Espresso" in extracted_text:
-                new_extracted_text = extractor.extract_text_from_pdf_pymupdf(file_path)
-                
-                start = time.time()
-                new_structured_data = extractor.extract_line_item_data(new_extracted_text, llm)
-                elapsed = round(time.time() - start, 2)
-                logger.info(f"LLM extraction completed in {elapsed}s")
-                # print(structured_data)
-
-                updated_data = handler.update_product_names(structured_data, new_structured_data)
-
-            # Step 3: Post-processing
-            updated_data = handler.extract_pack_details(structured_data)
-
-            updated_data = handler.add_item_count(updated_data)
-
-            updated_data = handler.calculate_missing_fields(updated_data)
-
-            # Apply only for "Anchor Packaging"
-            supplier_name = (updated_data.get("supplier_name") or "").strip().casefold()
-            if supplier_name in {"tax invoice", "anchor packaging", "anchorpackaging.com.au"}:
-                updated_data = handler.recalculate_anchor_packaging_gst(updated_data)
-
-            # Replace Supplier Name
-            if updated_data.get('supplier_name') in ['Plum SCH', 'Plume Liverpool', 'Lifegrain Liverpool Cafe', 'LifeGrain Central Pty Ltd']:
-                updated_data['supplier_name'] = 'LifeGrain Central Kitchen'
-
-            # Apply only for "PNM SYDNEY PTY LTD"
-            if updated_data.get("supplier_name", "").strip().lower() == "pnm sydney pty ltd":
-                updated_data = handler.reconcile_published_totals(updated_data)
-
-            updated_data = handler.normalize_financial_fields(updated_data)
-
-            updated_data = handler.normalize_line_items(updated_data)
-
-            # updated_data = handler.validate_and_correct_line_totals(updated_data)
-
-            updated_data = handler.recalculate_totals_and_variances(updated_data)
-
-            updated_data = handler.reorder_invoice_data(updated_data)
+            updated_data = handler.exctract_invoice_data(file_path, llm)
 
             # Step 4: Save JSON
             with open(json_path, "w") as f:

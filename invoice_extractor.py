@@ -16,7 +16,6 @@ class InvoiceExtractor:
 
     def extract_text_from_pdf(self, pdf_path):
         """Extracts text content from a PDF file."""
-        self.logger.info(f"Extracting text from PDF: `{os.path.basename(pdf_path)}`")
         text = ""
         try:
             with pdfplumber.open(pdf_path) as pdf:
@@ -38,7 +37,6 @@ class InvoiceExtractor:
 
     def extract_text_from_pdf_pymupdf(self, pdf_path):
         """Extracts text content from a PDF file using PyMuPDF (fitz)."""
-        self.logger.info(f"Extracting text from PDF Using PyMuPDF: `{os.path.basename(pdf_path)}`")
         text = ""
         try:
             with fitz.open(pdf_path) as doc:
@@ -120,8 +118,15 @@ SPECIAL CONDITIONS
 
 Exclude the following items from `Line_Items` and handle separately:
 
-- If `product_name` or description contains **"Freight"** or **"Fuel Levy"**:
-  - Set `"shipping_cost"` to the line total excluding GST, or `0.0` if not found.
+- `shipping_cost`: Extract the `shipping_cost` from the provided invoice text with the following rules: 
+    - Identify any line item where the product name or description contains **"Freight"** or **"Fuel Levy"**.
+    - For such a line, extract the `shipping_cost` from **only** one of the following columns (in order of preference): **"Line Total"**, **"Ex. GST TOTAL"**, **"Line Value"**, **"TOTAL"**, or **"Amount Ex GST"**. 
+    - **Strictly exclude** values from the following columns: "Unit Price", "Disc.", "GST", "Qty", or any calculated or non-total columns.
+    - If the identified line has a blank, missing, or invalid (e.g., non-numeric) value in all of the allowed total columns, set `"shipping_cost": 0.0`.
+    - If no line contains "Freight" or "Fuel Levy", or if no valid total column exists for such a line, return `"shipping_cost": 0.0`.
+        - Example:
+            - Input: "1.0 FREMET Metro Freight 15.00 100.00% 0.00"
+            - Output: `shipping_cost: 0.0`
 
 - If it contains **"Case Rate"**:
   - Set `"picking_charge"` to the line total excluding GST, or `0.0` if not found.
@@ -193,7 +198,7 @@ Here is the invoice text:
             return {"error": "Failed to parse JSON from LLM response", "raw_output": response.content}
 
     def extract_line_item_data(self, text, llm):
-      self.logger.info("Running LLM for structured invoice data...")
+      self.logger.info("Running LLM for line item product name.")
 
       prompt_template = PromptTemplate(
           input_variables=["text"],
